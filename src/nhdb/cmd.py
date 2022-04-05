@@ -10,6 +10,7 @@ class CommandInterpreter:
     def __init__(self, logger: Logger) -> None:
         self.console = Console()
         self.commands: list[dict] = []
+        self.logger = logger
 
     def command(self, alias: str | Sequence[str] = None, force: bool = False):
         """
@@ -84,17 +85,26 @@ USAGE: [i]help <topic>[/i]
 
                 self.console.print(commands)
 
-    def promptLoop(self):
+    def prompt(self):
         """
         Initiates the Prompt Loop
         """
-        while True:
-            match Prompt.ask("").split():
-                case ["help", *cmd]:
-                    self.printHelp(cmd)
-                case [func, *args]:
-                    if (res := self.searchCommand(func)) is not None:
-                        res(*args)
+        commands = self.console.input("[magenta]>[/magenta] ").split(";")
+        for command in map(lambda c: c.strip(), commands):
+            self.handleCommand(command)
+
+    def handleCommand(self, cmd: str):
+        match cmd.split():
+            case ["help" | "h", *topic]:
+                self.printHelp(topic)
+            case [func, *args]:
+                if (res := self.searchCommand(func)) is not None:
+                    res(*args)
+                else:
+                    self.logger.error(f"No such command: [magenta]{func}[/magenta]")
+                    self.logger.info(
+                        f"Run [yellow bold]help[/yellow bold] to see the list of commands"
+                    )
 
     def searchCommand(self, alias: str) -> Callable | None:
         return next(
@@ -107,4 +117,5 @@ USAGE: [i]help <topic>[/i]
         )
 
     def cmdloop(self):
-        self.promptLoop()
+        while True:
+            self.prompt()

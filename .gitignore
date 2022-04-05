@@ -1,2 +1,11 @@
+# Exclude nhdb's virtual environment
 venv
+
+# Exclude nhdb byte-code
 __pycache__
+
+# Exclude SQL DBs created by nhdb
+*.sqlite*
+
+# Exclude nhdb's command logs
+logs

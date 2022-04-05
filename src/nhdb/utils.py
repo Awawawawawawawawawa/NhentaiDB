@@ -1,5 +1,5 @@
 from rich.logging import RichHandler
-from logging import Handler, Logger, Formatter
+from logging import FileHandler, Handler, Logger, Formatter, StreamHandler
 from enum import Enum
 
 
@@ -10,13 +10,20 @@ class LogLevel(Enum):
     ERROR = 40
 
 
-def makeLogger(loglevel: LogLevel, handler: Handler = None):
+def makeLogger(
+    loglevel: LogLevel,
+    handler: Handler = None,
+):
     logger = Logger(loglevel.value)
     handle = handler or RichHandler(
-        loglevel.value, show_time=True, show_level=True, markup=True
+        show_time=True, show_path=False, show_level=True, markup=True, log_time_format="%H:%M:%S"
     )
-
-    # handle.setFormatter(format)
+    formatter = Formatter(
+        "[%(asctime)s | %(module)s.py:%(funcName)s:%(lineno)s | %(levelname)s] %(message)s"
+    )
+    handle.setFormatter(formatter) if isinstance(
+        handler, FileHandler | StreamHandler
+    ) else ...
     logger.addHandler(handle)
 
     return logger
