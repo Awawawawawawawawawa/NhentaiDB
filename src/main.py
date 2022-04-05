@@ -1,14 +1,8 @@
-from nhdb import CommandInterpreter
-
-nhdb = CommandInterpreter()
-
-
-@nhdb.command(["exit", "quit"], True)
-def quitApp():
-    """
-    Quits the program
-    """
-    exit()
-
-
-nhdb.cmdloop()
+from nhdb import (
+    ProjectConfig,
+    SauceDB,
+    SauceDeliverer,
+    LogLevel,
+    CommandInterpreter,
+    makeLogger,
+)

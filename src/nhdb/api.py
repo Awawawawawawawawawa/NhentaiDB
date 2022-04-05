@@ -1,8 +1,8 @@
-from typing import Callable
 from nhentei.nfunctions import getByID
 from itertools import count
-from threading import Thread
 from asyncio import run
+
+from .store import RecursiveNamespace
 
 
 class SauceDeliverer:
@@ -14,4 +14,4 @@ class SauceDeliverer:
 
     def run(self):
         for i in count():
-            yield run(getByID(i))
+            yield RecursiveNamespace(**run(getByID(i)))

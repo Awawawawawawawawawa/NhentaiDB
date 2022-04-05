@@ -3,10 +3,11 @@ from rich.console import Console
 from rich.prompt import Prompt
 from rich.table import Table
 from rich import print
+from logging import Logger
 
 
 class CommandInterpreter:
-    def __init__(self) -> None:
+    def __init__(self, logger: Logger) -> None:
         self.console = Console()
         self.commands: list[dict] = []
 

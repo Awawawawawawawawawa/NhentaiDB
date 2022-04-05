@@ -1,4 +1,4 @@
-from .store import ProjectConfig, SauceDB, RecursiveNamespace
+from .store import ProjectConfig, SauceDB
 from .api import SauceDeliverer
-from .utils import toPropertyName
+from .utils import makeLogger, LogLevel
 from .cmd import CommandInterpreter
