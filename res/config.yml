@@ -1,0 +1,5 @@
+paths:
+  database: ./res/nh-index.sqlite
+  runtime-logs: ./logs/runtime.log
+nhentai:
+  cache-limit: 100

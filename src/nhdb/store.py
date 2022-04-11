@@ -1,9 +1,14 @@
+from datetime import datetime
 from pathlib import Path
 from contextlib import suppress
-from sqlite3 import connect, Connection, OperationalError
+from sqlite3 import ProgrammingError, connect, Connection, OperationalError
 from typing import Any
 from yaml import load, Loader
+from pprint import pformat
+from NHentai.entities.doujin import Tag, Title
+
 from .utils import toPropertyName, toTagName
+from .exceptions import ItemAlreadyExists
 
 
 class SauceDB:
@@ -18,31 +23,60 @@ class SauceDB:
             )
 
     def __del__(self):
-        self.connection.commit()
-        self.connection.close()
+        with suppress(ProgrammingError):
+            self.connection.commit()
+            self.connection.close()
 
     def __enter__(self) -> Connection:
         return self.connection
 
     def __exit__(self, *err):
-        del self
+        with suppress(ProgrammingError):
+            self.connection.commit()
+            self.connection.close()
 
-    def columns():
+    @property
+    def columns(self):
         return ("id", "title", "uploaded", "tags", "pages", "favorites")
+
+    @property
+    def empty(self):
+        return bool(self.getSauces("id"))
+
+    def commit(self):
+        self.connection.commit()
+
+    def close(self):
+        self.connection.commit()
+        self.connection.close()
 
     def addSauce(
         self,
         id: int,
-        title: str,
-        uploaded: int,
-        tags: list,
+        title: Title,
+        uploaded: datetime,
+        tags: list[Tag],
         pages: int,
         favorites: int,
     ):
+        # Check if our doujin already exists
+        if self.getByID(id):
+            raise ItemAlreadyExists(f"Doujin #{id} already exists!")
+
         self.database.execute(
             "INSERT INTO sauces VALUES (?, ?, ?, ?, ?, ?)",
-            (id, title, uploaded, ";".join(map(toTagName, tags)), pages, favorites),
+            (
+                id,
+                title.pretty or title.english,
+                (uploaded - datetime(1970, 1, 1)).total_seconds(),
+                ";".join(map(toTagName, tags)),
+                pages,
+                favorites,
+            ),
         )
+
+    def getByID(self, id: int) -> tuple:
+        return tuple(filter(lambda i: i[0] == id, self.getSauces()))
 
     def getSauces(self, *columns):
         # print(f"SELECT {', '.join(columns) or '*'} FROM sauces")
@@ -57,7 +91,7 @@ class RecursiveNamespace:
         for k, v in kwargs.items():
             setattr(
                 self,
-                k,
+                toPropertyName(k),
                 RecursiveNamespace(**v)
                 if isinstance(v, dict)
                 else [RecursiveNamespace(**element) for element in v]
@@ -65,12 +99,16 @@ class RecursiveNamespace:
                 else v,
             )
 
+    def __repr__(self) -> str:
+        return "RecursiveNamespace(%s)" % ", ".join(
+            ["=".join((k, repr(v))) for k, v in self.__dict__.items()]
+        )
+
     def get(self, __k: str) -> Any:
         return getattr(self, __k)
 
 
-class ProjectConfig:
-    def __init__(self, file: Path) -> None:
-        with open(file) as f:
-            for name, value in load(f, Loader).items():
-                setattr(self, toPropertyName(name), value)
+def loadConfig(file: Path) -> RecursiveNamespace:
+    with open(file) as f:
+        with suppress(AttributeError):
+            return RecursiveNamespace(**load(f, Loader))

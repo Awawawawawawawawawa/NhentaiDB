@@ -9,3 +9,6 @@ __pycache__
 
 # Exclude nhdb's command logs
 logs
+
+# Exclude VS Code settings
+.vscode

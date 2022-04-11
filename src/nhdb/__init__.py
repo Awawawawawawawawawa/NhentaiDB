@@ -1,4 +1,3 @@
-from .store import ProjectConfig, SauceDB
-from .api import grabSauces
-from .utils import makeLogger, LogLevel
+from .store import loadConfig, SauceDB
+from .utils import makeLogger, toLogLevel, LogLevel
 from .cmd import CommandInterpreter
