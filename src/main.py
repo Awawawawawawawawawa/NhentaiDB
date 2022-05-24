@@ -11,6 +11,8 @@ from typing import Any, Sequence
 from atexit import register as atexit
 from itertools import count
 
+# import gnureadline
+
 # Rich Components
 from rich.table import Table
 from rich.console import Console
@@ -30,16 +32,14 @@ from nhdb import (
 from nhdb.exceptions import ItemAlreadyExists
 from nhdb.store import RecursiveNamespace
 
-D_QUOTE = '"'
 
 # Globals
-terminal = Console()
 config = loadConfig("./res/config.yml")
+console = Console(record=config.console.record)
 client = NHentai(config.nhentai.cache_limit)
 database = SauceDB(config.paths.database)
-mainLogger = makeLogger(LogLevel.INFO)
-fileLogger = makeLogger(LogLevel.INFO, FileHandler(config.paths.runtime_logs))
-app = CommandInterpreter(mainLogger)
+logger = makeLogger(LogLevel.INFO)
+app = CommandInterpreter(logger)
 
 
 @app.command(alias=["q", "exit", "quit"])
@@ -51,7 +51,7 @@ def quitApp():
     \tproblems for the program later on, so it is highly recommended to use this command instead
     \tof [u]^C[/u] and [u]^Z[/u]
     """
-    broadcastMessageToLoggers("Goodbye!")
+    logger.info("Goodbye!")
     quit()
 
 
@@ -64,8 +64,8 @@ def clean():
     """
     remove(config.paths.database)
     remove(config.paths.runtime_logs)
-    broadcastMessageToLoggers("Remove Generated Files")
-    broadcastMessageToLoggers("Please restart the program after the bye-bye message")
+    logger.info("Removed Generated Files")
+    logger.info("Please restart the program after the bye-bye message")
     quitApp()
 
 
@@ -76,15 +76,15 @@ def scanSauces():
 
     [i]Since nh's doujin index is pretty large, do not be surprised if it takes forever to finish[/i]
     """
-    broadcastMessageToLoggers("Updating database...")
+    logger.info("Updating database...")
 
-    while terminal.status(
+    while console.status(
         f"Updating Database..., check [bold cyan]{config.paths.runtime_logs}[/bold cyan] for the status",
         spinner="bouncingBar",
     ):
-        for chunk in chunkinate(count(getNextSauce()), 100):
+        for chunk in chunkinate(count(database.getNextId()), 10):
             threads = [
-                Thread(target=savedb, args=(id,), name=f"Doujin-Get::{id}")
+                Thread(target=savedb, args=(id,), name=f"Doujin-Get::{id}", daemon=False)
                 for id in chunk
             ]
 
@@ -102,7 +102,7 @@ def getSauce(key: str, value: int):
         sauce-get tag big boobs
     """
     if key not in database.columns:
-        mainLogger.error(f"{key!r} is invalid")
+        logger.error(f"{key!r} is invalid")
         return
 
     print(key, value)
@@ -116,7 +116,7 @@ def listSauce():
     # print(database.empty)
 
     if database.empty:
-        mainLogger.error(
+        logger.error(
             "Database is empty! Run [magenta bold]sauce-update[/magenta bold] to index NHentai"
         )
         return
@@ -145,10 +145,6 @@ def listSauce():
 def savedb(id: int):
     data = client.get_doujin(str(id))
 
-    fileLogger.info(
-        f'Adding "{(data.title.pretty or shorten(data.title.english, 20)).strip(D_QUOTE)}" (#{data.id})'
-    )
-
     try:
         database.addSauce(
             data.id,
@@ -158,19 +154,11 @@ def savedb(id: int):
             data.total_pages,
             data.total_favorites,
         )
-        fileLogger.info(f"Added #{data.id} to database")
         database.commit()
-
-        fileLogger.info(f"Committed #{data.id} to database")
     except ItemAlreadyExists:
-        mainLogger.error(f"Doujin {id} already exists!")
-
-
-def getNextSauce() -> int:
-    try:
-        return max(database.getSauces("id")) + 1
-    except ValueError:
-        return 1
+        logger.error(f"Doujin {id} already exists!")
+    except Exception:
+        console.print_exception(show_locals=True)
 
 
 def dissectTag(rawTagData: str):
@@ -193,24 +181,13 @@ def chunkinate(data: Sequence[Any], chunkSize: int = 1000):
             break
 
 
-def broadcastMessageToLoggers(
-    msg: str, level: LogLevel = LogLevel.INFO, showTraceback: bool = False
-):
-    funcName = stack()[1].function
-    mainLogger.log(level.value, msg, exc_info=showTraceback)
-    fileLogger.log(
-        level.value, f"[Broadcasted from {funcName}] {msg}", exc_info=showTraceback
-    )
-
-
 @atexit
 def programExit():
     try:
         database.close()
-        broadcastMessageToLoggers("Database is closed")
     except ProgrammingError:
-        broadcastMessageToLoggers("Databased is closed! How?", LogLevel.ERROR)
-    broadcastMessageToLoggers("Exiting...")
+        logger.error("Databased is closed! How?")
+    logger.info("Exiting...")
 
 
 def main():
@@ -221,3 +198,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # print(database.getNextId())

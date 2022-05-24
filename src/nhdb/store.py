@@ -76,11 +76,15 @@ class SauceDB:
         )
 
     def getByID(self, id: int) -> tuple:
-        return tuple(filter(lambda i: i[0] == id, self.getSauces()))
+        # return tuple(filter(lambda i: i[0] == id, self.getSauces()))
+        return self.database.execute(
+            "SELECT id FROM sauce WHERE id = ?", (id,)
+        ).fetchone()
+
+    def getNextId(self) -> int:
+        return self.database.execute("SELECT COUNT(id) FROM sauces").fetchone()[0]
 
     def getSauces(self, *columns):
-        # print(f"SELECT {', '.join(columns) or '*'} FROM sauces")
-        # return ""
         yield from self.database.execute(
             f"SELECT {', '.join(columns) or '*'} FROM sauces"
         )

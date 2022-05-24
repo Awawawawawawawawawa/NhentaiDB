@@ -3,3 +3,5 @@ paths:
   runtime-logs: ./logs/runtime.log
 nhentai:
   cache-limit: 100
+console:
+  record: true

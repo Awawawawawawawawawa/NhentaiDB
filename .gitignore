@@ -1,5 +1,6 @@
 # Exclude nhdb's virtual environment
 venv
+.venv
 
 # Exclude nhdb byte-code
 __pycache__

@@ -62,7 +62,7 @@ class CommandInterpreter:
 
         return setSanity
 
-    def printHelp(self, topic):
+    def printHelp(self, topic: str):
         match topic:
             case ["help"]:
                 print(
@@ -83,6 +83,8 @@ USAGE: [i]help <topic>[/i]
                             )
                         )
                     )
+                else:
+                    self.logger.error(f"No help for {cmd}")
             case [""] | []:
                 commands = Table(
                     "Command",
@@ -113,44 +115,118 @@ USAGE: [i]help <topic>[/i]
         """
         Initiates the Prompt Loop
         """
-        commands = self.console.input("[magenta]>[/magenta] ").split(";")
+        commands = self.sanityHook(self.console.input("[magenta]>[/magenta] ")).split(";")
+
         for command in map(lambda c: c.strip(), commands):
             self.handleCommand(command)
 
     def handleCommand(self, cmd: str):
+        """
+        Handles an individual command
+
+        This is usually ran by `prompt` for every command passed in a line
+
+        Parameters
+        ----------
+        cmd : str
+            Command to parse. Should not have any semicolons
+        """
         match cmd.split():
-            case ["help" | "h", *topic]:
+            case ["help" | "h", *topic]:  # User asks for help
                 self.printHelp(topic)
-            case [function, *args]:
-                if (function := self.searchCommand(function)) is None:
-                    self.logger.error(f"No such command: [magenta]{function}[/magenta]")
-                    self.logger.info(
-                        f"Run [yellow bold]help[/yellow bold] to see the list of commands"
-                    )
-                    return
-                functionArgumentTypes = tuple(function.__annotations__.values())
+            case [func, *args]:  # User runs a command
+                func, funcExists = self._doesTheCommandExist(func)
+                funcCastMap = tuple(func.__annotations__.values())
 
-                if (passedArgCount := len(args)) != (
-                    functionArgCount := len(functionArgumentTypes)
-                ):
-                    self.logger.error(
-                        f"Expected {functionArgCount} arguments, got {passedArgCount}"
-                    )
-                    del passedArgCount, functionArgCount
+                if not funcExists and self._ensureCorrectArgCount(args, funcCastMap):
                     return
 
-                argumentsToPass = []
-                for index, arg in enumerate(args):
-                    target = functionArgumentTypes[index]
-                    try:
-                        argumentsToPass.append(target(arg))
-                    except ValueError:
-                        self.logger.error(
-                            f"Unable to cast argument {arg!r} to {target.__name__}"
-                        )
-                        return
+                argumentsToPass = self._castArgs(args, funcCastMap)
+                func(*argumentsToPass)
 
-                function(*argumentsToPass)
+    def _ensureCorrectArgCount(
+        self, args: tuple[str], castMap: tuple[dict[str, object]]
+    ) -> bool:
+        """
+        Checks if the arguments can match the cast map 1:1
+
+        Ran by`handleCommand` to check if the correct amount of arguments
+        have been passed
+
+        Parameters
+        ----------
+        args : tuple of strings
+            Raw arguments from `prompt`
+        castMap : tuple of dictionaries
+            The cast map registered by the `command` decorator
+
+        Returns
+        -------
+        bool
+            `True` if all is go, `False` otherwise
+        """
+        if (passedArgCount := len(args)) != (functionArgCount := len(castMap)):
+            self.logger.error(
+                f"Expected {functionArgCount} arguments, got {passedArgCount}"
+            )
+            del passedArgCount, functionArgCount
+            return False
+        return True
+
+    def _doesTheCommandExist(self, function: str) -> bool:
+        """
+        Checks if the command exists
+
+        Ran by `handleCommand` in order to check if the command
+        even exists in the first place before proceeding
+
+        Parameters
+        ----------
+        function : str
+            Name of the function
+
+        Returns
+        -------
+        bool
+            `True` if all is go, `False` otherwise
+        """
+        if (function := self.searchCommand(function)) is None:
+            self.logger.error(f"No such command: [magenta]{function}[/magenta]")
+            self.logger.info(
+                f"Run [yellow bold]help[/yellow bold] to see the list of commands"
+            )
+            return None, False
+        return function, True
+
+    def _castArgs(self, args: tuple[str], castMap: tuple[dict[str, object]]) -> list:
+        """
+        Casts the args according to its map so that the function that will be ran
+        can use that object's properties accordingly
+
+        Ran by `handleCommand` in the final step before calling the function
+
+        Parameters
+        ----------
+        args : tuple of strings
+            Raw arguments from `prompt`
+        castMap : tuple of dictionaries
+            The mapping to reference during casting every argument
+
+        Returns
+        -------
+        list
+            `args` but each object has been casted accordingly
+        """
+        argumentsToPass = []
+
+        for index, arg in enumerate(args):
+            target = castMap[index]
+            try:
+                argumentsToPass.append(target(arg))
+            except ValueError:
+                self.logger.error(f"Unable to cast argument {arg!r} to {target.__name__}")
+                return
+        return argumentsToPass
 
     def searchCommand(self, alias: str) -> Callable | None:
         return next(
