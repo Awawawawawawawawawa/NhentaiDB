@@ -4,8 +4,9 @@ from contextlib import suppress
 from sqlite3 import ProgrammingError, connect, Connection, OperationalError
 from typing import Any
 from yaml import load, Loader
-from pprint import pformat
 from NHentai.entities.doujin import Tag, Title
+
+from rich.tree import Tree
 
 from .utils import toPropertyName, toTagName
 from .exceptions import ItemAlreadyExists
@@ -116,3 +117,46 @@ def loadConfig(file: Path) -> RecursiveNamespace:
     with open(file) as f:
         with suppress(AttributeError):
             return RecursiveNamespace(**load(f, Loader))
+
+
+def renderTree(
+    namespace: RecursiveNamespace, parent: Tree = None, recursing: bool = False
+) -> Tree:
+    """
+    Fun little function to view the namespace tree
+
+    `parent` and `recursing` should not be passed
+
+    Parameters
+    ----------
+    namespace : RecursiveNamespace
+        Namespace to render
+    parent : Tree, optional
+        Parent node. DO NOT PASS AN ARGUMENT HERE, by default None
+    recursing : bool, optional
+        Flag to check if the program is recursing. DO NOT PASS AN ARGUMENT HERE, by default False
+
+    Returns
+    -------
+    Tree
+        Tree to render
+    """
+    root = (
+        parent
+        if recursing
+        else Tree(":beginner: [bold magenta]Config Root[/bold magenta]")
+    )
+
+    for k, v in namespace.__dict__.items():
+        node = Tree(f":large_blue_diamond: Node [green]{k!r}[/green]")
+
+        if isinstance(v, RecursiveNamespace):
+            root.add(renderTree(v, node, True))
+        else:
+            node.add(
+                f":large_orange_diamond: Value: [italic yellow]{v!r}[/italic yellow]"
+            )
+            node.add(f":large_orange_diamond: Type: [cyan]{type(v).__name__}[/cyan]")
+            root.add(node)
+
+    return root

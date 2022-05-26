@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Any, Sequence
 from rich.logging import RichHandler
 from logging import FileHandler, Handler, Logger, Formatter, StreamHandler
 from enum import Enum
@@ -60,3 +60,23 @@ def cleanseArgument(arg: str) -> str:
     Default cleanse hook for the `CommandInterpreter` object
     """
     return massReplace(arg, [("\\", "")])
+
+
+def dissectTag(rawTagData: str):
+    for tag in rawTagData.split(";"):
+        yield from tag.split(":")
+
+
+def chunkinate(data: Sequence[Any], chunkSize: int = 1000):
+    # sourcery skip: for-append-to-extend
+    dataIter = iter(data)
+    while True:
+        chunk = []
+        try:
+            for _ in range(chunkSize):
+                chunk.append(next(dataIter))
+            yield chunk
+        except StopIteration:
+            if chunk:
+                yield chunk
+            break

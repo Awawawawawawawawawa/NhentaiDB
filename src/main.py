@@ -1,12 +1,9 @@
 # General Dependencies
 from contextlib import suppress
 from datetime import datetime
-from logging import FileHandler
 from os import remove
 from sqlite3 import ProgrammingError
-from textwrap import shorten
 from threading import Thread
-from inspect import stack
 from typing import Any, Sequence
 from atexit import register as atexit
 from itertools import count
@@ -28,9 +25,10 @@ from nhdb import (
     LogLevel,
     CommandInterpreter,
     makeLogger,
+    dissectTag,
+    chunkinate,
 )
 from nhdb.exceptions import ItemAlreadyExists
-from nhdb.store import RecursiveNamespace
 
 
 # Globals
@@ -113,8 +111,6 @@ def listSauce():
     """
     Lists doujins stored in the [green]database[/green]
     """
-    # print(database.empty)
-
     if database.empty:
         logger.error(
             "Database is empty! Run [magenta bold]sauce-update[/magenta bold] to index NHentai"
@@ -161,26 +157,6 @@ def savedb(id: int):
         console.print_exception(show_locals=True)
 
 
-def dissectTag(rawTagData: str):
-    for tag in rawTagData.split(";"):
-        yield from tag.split(":")
-
-
-def chunkinate(data: Sequence[Any], chunkSize: int = 1000):
-    # sourcery skip: for-append-to-extend
-    dataIter = iter(data)
-    while True:
-        chunk = []
-        try:
-            for _ in range(chunkSize):
-                chunk.append(next(dataIter))
-            yield chunk
-        except StopIteration:
-            if chunk:
-                yield chunk
-            break
-
-
 @atexit
 def programExit():
     try:
@@ -192,10 +168,23 @@ def programExit():
 
 def main():
     while True:
-        with suppress(KeyboardInterrupt):
+        with suppress(KeyboardInterrupt, EOFError):
             app.cmdloop()
 
 
 if __name__ == "__main__":
-    main()
-    # print(database.getNextId())
+    try:
+        main()
+    except Exception:
+        from datetime import datetime
+        from rich.terminal_theme import *
+
+        now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        filename = f"nhdb-crash-{now}.svg"
+
+        logger.error("Uh Oh!")
+        console.print_exception()
+        console.save_svg(filename, theme=MONOKAI, title=filename.split(".")[0])
+        logger.info(
+            f"Exported record of the console output to [underline cyan]{filename}[/underline cyan]. Please send this to the developer"
+        )

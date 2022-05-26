@@ -138,7 +138,9 @@ USAGE: [i]help <topic>[/i]
                 func, funcExists = self._doesTheCommandExist(func)
                 funcCastMap = tuple(func.__annotations__.values())
 
-                if not funcExists and self._ensureCorrectArgCount(args, funcCastMap):
+                if not funcExists:
+                    return
+                if not self._ensureCorrectArgCount(args, funcCastMap):
                     return
 
                 argumentsToPass = self._castArgs(args, funcCastMap)
